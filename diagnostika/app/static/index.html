@@ -1,0 +1,519 @@
+<!doctype html>
+<html lang="hy">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Դերմատոսկոպիկ վերլուծություն</title>
+<style>
+  :root {
+    --bg: #f5f7fa; --surface: #ffffff; --text: #1d2430; --muted: #5b6676;
+    --border: #d5dbe4; --accent: #1f5fbf; --accent-text: #ffffff;
+    --warn-bg: #fff4d6; --warn-border: #c98a00; --warn-text: #5c3d00;
+    --danger-bg: #fde7e7; --danger-border: #b42323; --danger-text: #6d1313;
+    --bar: #6b8fd6; --malig-bar: #c2410c; --focus: #ffb000;
+    --radius: 10px; --gutter: 16px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f141b; --surface: #171e28; --text: #e8edf4; --muted: #a3afbf;
+      --border: #2f3a49; --accent: #6ea3ff; --accent-text: #0b1220;
+      --warn-bg: #3a2d08; --warn-border: #d9a33a; --warn-text: #ffe2a3;
+      --danger-bg: #3d1414; --danger-border: #ff7b7b; --danger-text: #ffd6d6;
+      --bar: #4f73b8; --malig-bar: #ff8a4c; --focus: #ffd060;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f141b; --surface: #171e28; --text: #e8edf4; --muted: #a3afbf;
+    --border: #2f3a49; --accent: #6ea3ff; --accent-text: #0b1220;
+    --warn-bg: #3a2d08; --warn-border: #d9a33a; --warn-text: #ffe2a3;
+    --danger-bg: #3d1414; --danger-border: #ff7b7b; --danger-text: #ffd6d6;
+    --bar: #4f73b8; --malig-bar: #ff8a4c; --focus: #ffd060;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text);
+    font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, "Noto Sans Armenian", Arial, sans-serif; }
+  body { padding: var(--gutter); }
+  main { max-width: 980px; margin: 0 auto; display: grid; gap: var(--gutter); }
+  header h1 { font-size: 1.5rem; margin: 0 0 4px; }
+  header p { margin: 0; color: var(--muted); }
+  section { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: var(--gutter); }
+  section h2 { font-size: 1.1rem; margin: 0 0 10px; }
+  .disclaimer { background: var(--warn-bg); border: 1px solid var(--warn-border); color: var(--warn-text);
+    border-radius: var(--radius); padding: 10px 12px; font-weight: 600; }
+  button, select, textarea, input[type=file] { font: inherit; color: inherit; }
+  button { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px;
+    padding: 8px 14px; min-height: 44px; min-width: 44px; cursor: pointer; }
+  button:hover:not(:disabled) { border-color: var(--accent); }
+  button.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); font-weight: 600; }
+  button:disabled { opacity: .5; cursor: not-allowed; }
+  :focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+  .actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 12px; }
+  .viewer { border: 1px dashed var(--border); border-radius: var(--radius); background: var(--bg);
+    max-height: 70vh; overflow: auto; min-height: 180px; display: flex; align-items: flex-start; justify-content: center; }
+  .viewer:empty::before { content: "Պատկերը դեռ ընտրված չէ"; color: var(--muted); padding: 24px; }
+  canvas { display: block; max-width: none; touch-action: none; cursor: crosshair; }
+  .hint { color: var(--muted); font-size: .92rem; margin: 8px 0 0; }
+  .status { min-height: 1.5em; margin: 8px 0 0; font-weight: 600; }
+  .error { color: var(--danger-text); }
+  .alert { border-radius: var(--radius); padding: 12px; margin-bottom: 12px; border: 1px solid; }
+  .alert.referral { background: var(--danger-bg); border-color: var(--danger-border); color: var(--danger-text); font-weight: 600; }
+  .alert.unclear { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-text); }
+  .alert.warning { background: var(--warn-bg); border-color: var(--warn-border); color: var(--warn-text); margin: 6px 0 0; }
+  table { width: 100%; border-collapse: collapse; }
+  th, td { text-align: left; padding: 6px 4px; border-bottom: 1px solid var(--border); vertical-align: middle; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .row-malignant td { font-weight: 700; }
+  .row-malignant .bar span { background: var(--malig-bar); }
+  .bar { position: relative; height: 12px; background: var(--border); border-radius: 6px; min-width: 60px; overflow: hidden; }
+  .bar span { position: absolute; left: 0; top: 0; bottom: 0; background: var(--bar); border-radius: 6px; }
+  details { border: 1px solid var(--border); border-radius: 8px; padding: 8px 12px; margin-top: 10px; }
+  summary { cursor: pointer; font-weight: 600; min-height: 32px; }
+  .grid2 { display: grid; gap: 10px; grid-template-columns: 1fr; }
+  label { display: grid; gap: 4px; font-weight: 600; }
+  select, textarea { padding: 8px; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); min-height: 44px; }
+  textarea { min-height: 70px; resize: vertical; }
+  .log-note { color: var(--muted); font-size: .9rem; }
+  footer { color: var(--muted); font-size: .9rem; text-align: center; padding-bottom: 12px; }
+  @media (min-width: 720px) { .grid2 { grid-template-columns: 1fr 1fr; } }
+  @media (prefers-reduced-motion: reduce) {
+    *, *::before, *::after { transition: none !important; animation: none !important; scroll-behavior: auto !important; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <header>
+    <h1>Երկփուլ դերմատոսկոպիկ վերլուծություն</h1>
+    <p>Բարորակ և չարորակ գնահատում, ապա բարորակ ենթատիպի բաշխում</p>
+  </header>
+
+  <div class="disclaimer" role="note">
+    Հետազոտական նախատիպ է, ոչ թե բժշկական ախտորոշիչ սարք։ Արդյունքը աջակցում է, բայց չի փոխարինում
+    բժշկի դատողությանը։
+  </div>
+
+  <section aria-labelledby="h-upload">
+    <h2 id="h-upload">1. Պատկերի ընտրություն</h2>
+    <label for="file" style="font-weight:600">Ընտրել դերմատոսկոպիկ պատկեր (JPEG, PNG, WebP)</label>
+    <input id="file" type="file" accept="image/jpeg,image/png,image/webp">
+    <div class="toolbar" role="toolbar" aria-label="Մասշտաբ և ընտրություն" style="margin-top:12px">
+      <button id="zoomOut" type="button" aria-label="Փոքրացնել" disabled>−</button>
+      <button id="zoomIn" type="button" aria-label="Մեծացնել" disabled>+</button>
+      <button id="zoomReset" type="button" disabled>Նորմալ չափ</button>
+      <button id="roiClear" type="button" disabled>Մաքրել ընտրությունը</button>
+    </div>
+    <div id="viewer" class="viewer" aria-label="Պատկերի դիտում"></div>
+    <p class="hint" id="hint">
+      Քաշեք մկնիկով ուռուցքի շուրջ ուղղանկյուն։ Ստեղնաշարով՝ կիզակետը պատկերի վրա է.
+      <kbd>N</kbd> ստեղծում է ուղղանկյուն, սլաքները տեղափոխում են, <kbd>Shift</kbd>+սլաքները փոխում են չափը,
+      <kbd>Delete</kbd>-ը ջնջում է։
+    </p>
+    <p id="status" class="status" role="status" aria-live="polite"></p>
+    <div class="actions">
+      <button id="analyzeRoi" class="primary" type="button" disabled>Վերլուծել ընտրված հատվածը</button>
+      <button id="analyzeFull" class="primary" type="button" disabled>Վերլուծել ամբողջ պատկերը</button>
+    </div>
+  </section>
+
+  <section id="results" aria-labelledby="h-results" hidden>
+    <h2 id="h-results">2. Արդյունք</h2>
+    <div id="alerts"></div>
+    <table aria-describedby="probHint">
+      <caption id="probHint" style="text-align:left;color:var(--muted);padding-bottom:6px">
+        Հավանականությունները՝ երեք տասնորդական նիշով
+      </caption>
+      <thead><tr><th scope="col">Դաս</th><th scope="col">Հավանականություն</th><th scope="col" class="num">Արժեք</th></tr></thead>
+      <tbody id="probRows"></tbody>
+    </table>
+    <p id="agreement" class="hint"></p>
+    <p id="cropInfo" class="hint"></p>
+    <details>
+      <summary>Մոդելների մանրամասն արդյունքներ</summary>
+      <div id="perModel"></div>
+    </details>
+  </section>
+
+  <section aria-labelledby="h-log" id="logSection" hidden>
+    <h2 id="h-log">3. Բժշկի գնահատական և մատյան</h2>
+    <div class="grid2">
+      <label>Ձեր ախտորոշումը
+        <select id="doctorChoice">
+          <option value="">— ընտրել —</option>
+          <option value="benign">Բարորակ</option>
+          <option value="malignant">Չարորակ</option>
+          <option value="uncertain">Անորոշ</option>
+          <option value="other">Այլ (նշեք մեկնաբանության մեջ)</option>
+        </select>
+      </label>
+      <label>Մեկնաբանություն (ոչ պարտադիր)
+        <textarea id="doctorNote" maxlength="500"></textarea>
+      </label>
+    </div>
+    <div class="actions">
+      <button id="logAdd" class="primary" type="button">Գրանցել վերլուծությունը</button>
+      <button id="logCsv" type="button" disabled>Ներբեռնել CSV մատյանը (0)</button>
+    </div>
+    <p class="log-note">Մատյանը պահվում է միայն այս էջի հիշողության մեջ. պատկերները չեն պահվում և չեն ուղարկվում
+      սերվեր անձնական տվյալներ չեն պարունակում։ Էջը փակելիս մատյանը կորչում է։</p>
+  </section>
+</main>
+
+<footer>
+  <p>Հետազոտական նախատիպ, ոչ բժշկական սարք։ Մոդելները վերապատրաստվել են DERM12345 տվյալներով։</p>
+</footer>
+
+<script>
+(function () {
+  "use strict";
+
+  var LABELS = {
+    malignant: "Չարորակ (malignant)",
+    bdb: "Կապույտ նևուս (bdb)",
+    cb: "Բաղադրյալ նևուս (cb)",
+    db: "Դերմալ նևուս (db)",
+    srjd: "Սպիցի/Ռիդի նևուս (srjd)",
+    other_benign: "Այլ բարորակ (other_benign)"
+  };
+  var ZOOM_STEPS = [1, 1.5, 2, 3, 4];
+  var MIN_ROI = 0.01;
+
+  var el = function (id) { return document.getElementById(id); };
+  var fileInput = el("file"), viewer = el("viewer"), statusEl = el("status");
+  var zoomOut = el("zoomOut"), zoomIn = el("zoomIn"), zoomReset = el("zoomReset"), roiClear = el("roiClear");
+  var analyzeRoi = el("analyzeRoi"), analyzeFull = el("analyzeFull");
+  var canvas = document.createElement("canvas");
+  canvas.tabIndex = 0;
+  canvas.setAttribute("role", "img");
+  canvas.setAttribute("aria-label", "Դերմատոսկոպիկ պատկեր. ստեղնաշարի կառավարում՝ N, սլաքներ, Shift+սլաքներ, Delete");
+  viewer.appendChild(canvas);
+
+  var state = { img: null, zoomIndex: 0, roi: null, drag: null, busy: false, log: [] };
+  var ctx = canvas.getContext("2d");
+
+  function setStatus(msg, isError) {
+    statusEl.textContent = msg || "";
+    statusEl.classList.toggle("error", !!isError);
+  }
+
+  function fitWidth() {
+    return Math.max(120, viewer.clientWidth - 2);
+  }
+
+  function applyZoom() {
+    if (!state.img) return;
+    var w = fitWidth() * ZOOM_STEPS[state.zoomIndex];
+    canvas.style.width = Math.round(w) + "px";
+    canvas.style.height = "auto";
+    zoomOut.disabled = state.zoomIndex === 0;
+    zoomIn.disabled = state.zoomIndex === ZOOM_STEPS.length - 1;
+  }
+
+  function draw() {
+    if (!state.img) return;
+    ctx.drawImage(state.img, 0, 0, canvas.width, canvas.height);
+    if (state.roi) {
+      var W = canvas.width, H = canvas.height, r = state.roi;
+      var x = r.x * W, y = r.y * H, w = r.w * W, h = r.h * H;
+      ctx.fillStyle = "rgba(0,0,0,0.35)";
+      ctx.fillRect(0, 0, W, y);
+      ctx.fillRect(0, y + h, W, H - y - h);
+      ctx.fillRect(0, y, x, h);
+      ctx.fillRect(x + w, y, W - x - w, h);
+      ctx.lineWidth = Math.max(2, W / 200);
+      ctx.strokeStyle = "#ffb000";
+      ctx.strokeRect(x, y, w, h);
+    }
+    updateButtons();
+  }
+
+  function updateButtons() {
+    var hasImg = !!state.img;
+    roiClear.disabled = !state.roi;
+    zoomReset.disabled = !hasImg;
+    analyzeRoi.disabled = !hasImg || !state.roi || state.busy;
+    analyzeFull.disabled = !hasImg || state.busy;
+    el("logCsv").disabled = state.log.length === 0;
+    el("logCsv").textContent = "Ներբեռնել CSV մատյանը (" + state.log.length + ")";
+  }
+
+  function clampRoi(x, y, w, h) {
+    w = Math.min(Math.max(w, MIN_ROI), 1);
+    h = Math.min(Math.max(h, MIN_ROI), 1);
+    x = Math.min(Math.max(x, 0), 1 - w);
+    y = Math.min(Math.max(y, 0), 1 - h);
+    return { x: x, y: y, w: w, h: h };
+  }
+
+  function pointerToNorm(evt) {
+    var rect = canvas.getBoundingClientRect();
+    var nx = (evt.clientX - rect.left) / rect.width;
+    var ny = (evt.clientY - rect.top) / rect.height;
+    return { x: Math.min(Math.max(nx, 0), 1), y: Math.min(Math.max(ny, 0), 1) };
+  }
+
+  canvas.addEventListener("pointerdown", function (evt) {
+    if (!state.img) return;
+    var p = pointerToNorm(evt);
+    state.drag = { x0: p.x, y0: p.y };
+    canvas.setPointerCapture(evt.pointerId);
+    state.roi = null;
+    draw();
+  });
+  canvas.addEventListener("pointermove", function (evt) {
+    if (!state.drag) return;
+    var p = pointerToNorm(evt);
+    var x = Math.min(state.drag.x0, p.x), y = Math.min(state.drag.y0, p.y);
+    state.roi = clampRoi(x, y, Math.abs(p.x - state.drag.x0), Math.abs(p.y - state.drag.y0));
+    draw();
+  });
+  function endDrag() {
+    if (!state.drag) return;
+    state.drag = null;
+    if (state.roi && (state.roi.w < MIN_ROI * 2 || state.roi.h < MIN_ROI * 2)) state.roi = null;
+    setStatus(state.roi ? "Ընտրված է ուղղանկյուն։ Կարող եք վերլուծել ընտրված հատվածը։" : "");
+    draw();
+  }
+  canvas.addEventListener("pointerup", endDrag);
+  canvas.addEventListener("pointercancel", endDrag);
+
+  canvas.addEventListener("keydown", function (evt) {
+    if (!state.img) return;
+    var step = 0.01, big = evt.shiftKey;
+    var key = evt.key;
+    if (key === "n" || key === "N") {
+      state.roi = clampRoi(0.25, 0.25, 0.5, 0.5);
+    } else if (key === "Delete" || key === "Backspace") {
+      state.roi = null;
+    } else if (state.roi && key.indexOf("Arrow") === 0) {
+      var r = state.roi;
+      if (!big) {
+        var dx = key === "ArrowLeft" ? -step : key === "ArrowRight" ? step : 0;
+        var dy = key === "ArrowUp" ? -step : key === "ArrowDown" ? step : 0;
+        state.roi = clampRoi(r.x + dx, r.y + dy, r.w, r.h);
+      } else {
+        var dw = key === "ArrowLeft" ? -step : key === "ArrowRight" ? step : 0;
+        var dh = key === "ArrowUp" ? -step : key === "ArrowDown" ? step : 0;
+        state.roi = clampRoi(r.x, r.y, r.w + dw, r.h + dh);
+      }
+    } else {
+      return;
+    }
+    evt.preventDefault();
+    draw();
+    if (state.roi) setStatus("Ընտրություն՝ x " + pct(state.roi.x) + ", y " + pct(state.roi.y) +
+      ", լայնություն " + pct(state.roi.w) + ", բարձրություն " + pct(state.roi.h));
+    else setStatus("Ընտրությունը ջնջված է։");
+  });
+
+  function pct(v) { return Math.round(v * 100) + "%"; }
+
+  zoomIn.addEventListener("click", function () {
+    if (state.zoomIndex < ZOOM_STEPS.length - 1) { state.zoomIndex++; applyZoom(); }
+  });
+  zoomOut.addEventListener("click", function () {
+    if (state.zoomIndex > 0) { state.zoomIndex--; applyZoom(); }
+  });
+  zoomReset.addEventListener("click", function () { state.zoomIndex = 0; applyZoom(); });
+  roiClear.addEventListener("click", function () { state.roi = null; draw(); setStatus("Ընտրությունը ջնջված է։"); });
+  window.addEventListener("resize", applyZoom);
+
+  fileInput.addEventListener("change", function () {
+    var file = fileInput.files && fileInput.files[0];
+    if (!file) return;
+    if (!/^image\/(jpeg|png|webp)$/.test(file.type)) {
+      setStatus("Սխալ՝ ընտրեք JPEG, PNG կամ WebP պատկեր։", true);
+      return;
+    }
+    var url = URL.createObjectURL(file);
+    var img = new Image();
+    img.onload = function () {
+      URL.revokeObjectURL(url);
+      state.img = img;
+      state.roi = null;
+      state.zoomIndex = 0;
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      applyZoom();
+      draw();
+      setStatus("Պատկերը բեռնված է (" + img.naturalWidth + "×" + img.naturalHeight + ")։ Ընտրեք հատված կամ վերլուծեք ամբողջ պատկերը։");
+      el("results").hidden = true;
+      state.currentFile = file;
+    };
+    img.onerror = function () {
+      URL.revokeObjectURL(url);
+      setStatus("Սխալ՝ պատկերը չի կարող բեռնվել։", true);
+    };
+    img.src = url;
+  });
+
+  analyzeRoi.addEventListener("click", function () { analyze("roi"); });
+  analyzeFull.addEventListener("click", function () { analyze("full"); });
+
+  function analyze(mode) {
+    if (!state.img || !state.currentFile) { setStatus("Ընտրեք պատկեր նախ։", true); return; }
+    if (mode === "roi" && !state.roi) { setStatus("Ընտրեք ուղղանկյուն ընտրված հատվածի վերլուծության համար։", true); return; }
+    var form = new FormData();
+    form.append("file", state.currentFile, state.currentFile.name);
+    if (mode === "roi") {
+      form.append("roi_x", state.roi.x);
+      form.append("roi_y", state.roi.y);
+      form.append("roi_w", state.roi.w);
+      form.append("roi_h", state.roi.h);
+    }
+    state.busy = true; updateButtons();
+    setStatus("Վերլուծվում է…");
+    fetch("api/analyze", { method: "POST", body: form, credentials: "same-origin" })
+      .then(function (res) {
+        return res.json().catch(function () { return {}; }).then(function (body) {
+          if (!res.ok) throw new Error(body.detail || ("Սերվերի սխալ (" + res.status + ")"));
+          return body;
+        });
+      })
+      .then(function (body) {
+        state.last = body;
+        renderResult(body);
+        setStatus("Վերլուծությունն ավարտված է։");
+      })
+      .catch(function (err) {
+        setStatus("Սխալ՝ " + err.message, true);
+      })
+      .finally(function () { state.busy = false; updateButtons(); });
+  }
+
+  function renderResult(r) {
+    el("results").hidden = false;
+    logSectionShow();
+    var alerts = el("alerts");
+    alerts.textContent = "";
+    if (r.referral) {
+      alerts.appendChild(box("div", "alert referral", "Խորհուրդ է տրվում ուղեգրել մասնագետի։ Չարորակության հավանականությունը շեմից բարձր է (շեմ՝ " +
+        r.threshold.toFixed(3) + ")։ Ենթատիպի բաշխումը միայն տեղեկատվական նպատակով է։"));
+    }
+    if (r.unclear) {
+      alerts.appendChild(box("div", "alert unclear", "Արդյունքը անորոշ է. ոչ մի դաս բավարար հավանականություն չունի։"));
+    }
+    (r.warnings || []).forEach(function (w) {
+      alerts.appendChild(box("div", "alert warning", w.message));
+    });
+
+    var tbody = el("probRows");
+    tbody.textContent = "";
+    Object.keys(r.probabilities).forEach(function (key) {
+      var v = r.probabilities[key];
+      var tr = document.createElement("tr");
+      if (key === "malignant") tr.className = "row-malignant";
+      tr.appendChild(cell("th", LABELS[key] || key));
+      var barTd = document.createElement("td");
+      var bar = document.createElement("div");
+      bar.className = "bar";
+      var fill = document.createElement("span");
+      fill.style.width = (v * 100).toFixed(1) + "%";
+      bar.appendChild(fill);
+      barTd.appendChild(bar);
+      tr.appendChild(barTd);
+      tr.appendChild(cell("td", v.toFixed(3), "num"));
+      tbody.appendChild(tr);
+    });
+
+    el("agreement").textContent = "Համաձայնություն. " + r.agreement + " մոդելից " + r.n_models +
+      "-ը համընկնում է անսամբլի առաջատար բարորակ ենթատիպին (" + (LABELS[r.top_benign] || r.top_benign) + ")։";
+    var c = r.crop;
+    el("cropInfo").textContent = c.mode === "roi"
+      ? "Վերլուծված է ընտրված հատվածը՝ ամբողջ պատկերի " + Math.round(c.area_fraction * 100) + "%-ը։"
+      : "Վերլուծված է ամբողջ պատկերը։";
+
+    var pm = el("perModel");
+    pm.textContent = "";
+    r.per_model.forEach(function (m) {
+      var block = document.createElement("div");
+      block.style.marginTop = "10px";
+      var h = document.createElement("p");
+      h.style.margin = "0 0 4px";
+      h.innerHTML = "";
+      h.textContent = m.model + " — չարորակ՝ " + m.p_malignant.toFixed(3) + ", առաջատար բարորակ՝ " +
+        (LABELS[m.top_benign] || m.top_benign);
+      h.style.fontWeight = "600";
+      block.appendChild(h);
+      var t = document.createElement("table");
+      var tb = document.createElement("tbody");
+      Object.keys(m.benign_probabilities).forEach(function (k) {
+        var tr = document.createElement("tr");
+        tr.appendChild(cell("th", LABELS[k] || k));
+        tr.appendChild(cell("td", m.benign_probabilities[k].toFixed(3), "num"));
+        tb.appendChild(tr);
+      });
+      t.appendChild(tb);
+      block.appendChild(t);
+      pm.appendChild(block);
+    });
+    state.last = r;
+    state.lastMode = c.mode;
+  }
+
+  function logSectionShow() { el("logSection").hidden = false; }
+
+  function box(tag, cls, text) {
+    var d = document.createElement(tag);
+    d.className = cls;
+    d.textContent = text;
+    return d;
+  }
+  function cell(tag, text, cls) {
+    var c = document.createElement(tag);
+    if (tag === "th") c.scope = "row";
+    if (cls) c.className = cls;
+    c.textContent = text;
+    return c;
+  }
+
+  el("logAdd").addEventListener("click", function () {
+    var r = state.last;
+    if (!r) { setStatus("Նախ կատարեք վերլուծություն։", true); return; }
+    var roi = r.crop.roi;
+    var choice = el("doctorChoice").value;
+    if (!choice) { setStatus("Ընտրեք ձեր ախտորոշումը։", true); return; }
+    state.log.push({
+      timestamp: new Date().toISOString(),
+      mode: r.crop.mode,
+      roi_x: roi ? roi.x.toFixed(4) : "",
+      roi_y: roi ? roi.y.toFixed(4) : "",
+      roi_w: roi ? roi.w.toFixed(4) : "",
+      roi_h: roi ? roi.h.toFixed(4) : "",
+      p_malignant: r.probabilities.malignant.toFixed(3),
+      referral: r.referral ? "yes" : "no",
+      model_top_class: r.top_class,
+      doctor_choice: choice,
+      note: el("doctorNote").value.trim()
+    });
+    el("doctorNote").value = "";
+    el("doctorChoice").value = "";
+    setStatus("Գրանցված է։ Մատյանում՝ " + state.log.length + " գրառում։");
+    updateButtons();
+  });
+
+  el("logCsv").addEventListener("click", function () {
+    if (!state.log.length) return;
+    var cols = ["timestamp", "mode", "roi_x", "roi_y", "roi_w", "roi_h", "p_malignant", "referral",
+      "model_top_class", "doctor_choice", "note"];
+    var lines = [cols.join(",")];
+    state.log.forEach(function (row) {
+      lines.push(cols.map(function (c) {
+        var v = String(row[c] === undefined ? "" : row[c]);
+        return /[",\n]/.test(v) ? '"' + v.replace(/"/g, '""') + '"' : v;
+      }).join(","));
+    });
+    var blob = new Blob(["﻿" + lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    var a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "diagnostika-log.csv";
+    document.body.appendChild(a);
+    a.click();
+    setTimeout(function () { URL.revokeObjectURL(a.href); a.remove(); }, 0);
+  });
+
+  updateButtons();
+})();
+</script>
+</body>
+</html>

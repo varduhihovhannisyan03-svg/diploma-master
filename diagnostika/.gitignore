@@ -1,0 +1,34 @@
+# data and derived artifacts: never committed
+/data/
+/weights/
+/runs/
+# reports may contain image-derived content; only plain text tables are kept
+reports/*.png
+reports/*.jpg
+reports/*.jpeg
+reports/**/*.png
+reports/**/*.jpg
+# model files
+*.pt
+*.pth
+*.safetensors
+*.ckpt
+*.onnx
+# images
+*.jpg
+*.jpeg
+*.png
+*.webp
+*.dcm
+# secrets and credentials (Kaggle tokens are read only from environment variables)
+.env
+.env.*
+kaggle.json
+.kaggle/
+*.token
+# python
+__pycache__/
+*.pyc
+.pytest_cache/
+.venv/
+venv/
