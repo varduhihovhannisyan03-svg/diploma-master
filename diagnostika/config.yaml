@@ -1,0 +1,100 @@
+# diagnostika — single source of settings.
+# Every run records sha256 of this file (config_sha256). Relative paths are resolved
+# against the diagnostika/ folder, so commands work from any working directory.
+# Clinical values (target_sensitivity, the ROI warning ratio, ...) MUST be reviewed by a clinician.
+
+project:
+  name: diagnostika
+  seed: 42
+
+data:
+  # Kaggle download of DERM12345 (not committed). Set DERM12345 path here or via env DIAG_RAW_DIR.
+  raw_dir: data/raw/DERM12345
+  metadata_train: derm12345_metadata_train.csv   # official train split file (verify name in Kaggle version)
+  metadata_test: derm12345_metadata_test.csv     # official test split file
+  image_dirs:                                    # searched recursively; file stem must equal image_id
+    - derm12345_train_part_1
+    - derm12345_train_part_2
+    - derm12345_test
+  manifest_dir: data/manifests
+  reports_dir: reports
+  # Candidate column names, first match wins (the Kaggle schema has not been verified here).
+  columns:
+    image_id: [isic_id, image_id]
+    patient_id: [patient_id, study_patient_id]
+    label: [label]
+    malignancy: [malignancy]
+    split: [split]
+  patient_id_pattern: '^[A-Za-z0-9_\-]+$'
+  malignancy_values: [benign, malignant, indeterminate]
+  # Benign subtypes modelled explicitly; any other benign label is mapped to other_benign.
+  subtype_labels: [bdb, cb, db, srjd]
+  other_benign_label: other_benign
+  # Expected counts from the DERM12345 description. Compared and REPORTED, not enforced.
+  expected:
+    total: 12345
+    train: 9860
+    test: 2485
+    patients: 1627
+    subclasses: 40
+    indeterminate: 58
+    train_images_of_test_patients: 21
+    train_patients_of_test: 3
+
+dedup:
+  phash_hash_size: 8            # 8x8 pHash = 64 bits
+  phash_hamming_threshold: 4    # pairs with Hamming distance <= this are near-duplicates
+
+split:
+  seed: 42
+  n_folds: 5                    # StratifiedGroupKFold; the first fold (~20%) is the validation split
+
+training:
+  pretrained: true              # timm downloads ImageNet weights on first use (needs internet)
+  device: auto                  # auto | cpu | cuda
+  image_size: 224
+  head_epochs: 3                # backbone frozen, head only
+  finetune_epochs: 12           # full fine-tune upper bound
+  lr_head: 1.0e-3
+  lr_finetune: 2.0e-5
+  weight_decay: 1.0e-4
+  patience: 4
+  num_workers: 2
+  augment:
+    vertical_flip: true
+    rotate_degrees: 15
+    color_jitter: {brightness: 0.08, contrast: 0.08, saturation: 0.05}
+  # Config key -> timm architecture and per-architecture batch size (adjust to GPU memory and document it).
+  models:
+    resnet50: {timm: resnet50, batch_size: 32}
+    densenet121: {timm: densenet121, batch_size: 32}
+    efficientnet_b7: {timm: efficientnet_b7, batch_size: 4}
+    vit_b_16: {timm: vit_base_patch16_224, batch_size: 16}
+
+stage1:
+  weights_dir: weights/stage1
+  runs_dir: runs/stage1
+  selection_metric: roc_auc     # on validation only
+  target_sensitivity: 0.90      # threshold = highest value with validation sensitivity >= this. Clinician review required.
+
+stage2:
+  include_other_benign: true    # false: other_benign rows are dropped and the subtype distribution is renormalized
+  weights_dir: weights/stage2
+  runs_dir: runs/stage2
+  selection_metric: macro_f1    # on validation only
+
+inference:
+  ensemble_mode: average        # average | weighted
+  stage1_threshold_file: weights/stage1/threshold.json
+  stage2_weights_file: weights/stage2/weights.json
+  unclear_below: 0.5            # unclear when the largest final probability is below this
+  roi_min_area_fraction: 0.25   # warn when the ROI covers less than this fraction of the image
+  max_upload_mb: 20
+  host: 127.0.0.1
+  port: 8000
+
+evaluation:
+  runs_dir: runs/evaluation
+  bootstrap_resamples: 1000     # resampled by PATIENT
+  bootstrap_seed: 42
+  small_support_warning: 10     # classes with fewer test images get an instability warning
